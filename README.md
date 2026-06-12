@@ -19,7 +19,7 @@ An MVP web application built with **Streamlit** and **Python** to analyze advert
 ```text
 AI-Ads-Report-Dashboard-Generator/
 ├── app.py                  # Main Streamlit web application front-end
-├── sample_data.csv         # Realistic multi-campaign sample dataset
+├── sample_data.csv         # Realistic multi-campaign sample datasett
 ├── requirements.txt        # Application dependencies
 ├── README.md               # Setup and usage instructions
 └── utils/
