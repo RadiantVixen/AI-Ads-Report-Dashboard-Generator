@@ -14,7 +14,7 @@ from utils.data_processor import (
     get_best_and_worst_campaigns,
     compute_trends
 )
-from utils.openai_insights import generate_insights
+from utils.groq_insights import generate_insights, get_currency_symbol
 from utils.pdf_generator import generate_pdf
 
 # Set page config for responsive layout
@@ -102,16 +102,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ----------------- SIDEBAR CONFIG -----------------
-st.sidebar.markdown("<h2 style='text-align: center; color: #1E3A8A;'>⚙️ Configuration</h2>", unsafe_allow_html=True)
-
-# API Key check order: User Input -> Environment Variable
-env_key = os.getenv("OPENAI_API_KEY", "")
-api_key = st.sidebar.text_input(
-    "OpenAI API Key",
-    type="password",
-    value=env_key,
-    help="Enter your OpenAI API key to unlock written reports. We respect your privacy, your key is never saved."
-)
+# Groq key is loaded internally under the hood
+api_key = os.getenv("GROQ_API_KEY", "")
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("📂 Ads Performance Data")
@@ -143,7 +135,7 @@ st.sidebar.download_button(
 st.sidebar.markdown("---")
 st.sidebar.markdown(
     "<div style='text-align: center; font-size: 0.8rem; color: #9CA3AF;'>"
-    "AI Ads Report Generator v1.1.0<br>Marketing, Product & Region Intelligence"
+    "AI Ads Report Generator v1.2.0<br>Groq-Powered Marketing Intelligence"
     "</div>",
     unsafe_allow_html=True
 )
@@ -174,6 +166,9 @@ else:
 
 # ----------------- MAIN INTERFACE -----------------
 if df is not None:
+    # Detect currency prefix symbol dynamically from dataset
+    currency_symbol = get_currency_symbol(df)
+
     # 1. Title section
     st.markdown("<h1 style='color: #1E3A8A; margin-bottom: 5px;'>📊 AI Marketing, Product & Region Intelligence</h1>", unsafe_allow_html=True)
     st.markdown(f"<p class='dashboard-subtitle'>Analyzing <b>{data_source_name}</b> across {df['campaign_name'].nunique()} campaigns.</p>", unsafe_allow_html=True)
@@ -192,7 +187,7 @@ if df is not None:
     kpi_cols = st.columns(4)
     
     # Card 1: Spend
-    spend_val = f"${summary['total_spend']:,.2f}"
+    spend_val = f"{currency_symbol}{summary['total_spend']:,.2f}"
     with kpi_cols[0]:
         st.markdown(
             f"""<div class="kpi-card">
@@ -205,7 +200,7 @@ if df is not None:
         
     # Card 2: CTR & CPC
     ctr_val = f"{summary['overall_ctr']:.2%}"
-    cpc_val = f"${summary['overall_cpc']:.2f}"
+    cpc_val = f"{currency_symbol}{summary['overall_cpc']:.2f}"
     with kpi_cols[1]:
         st.markdown(
             f"""<div class="kpi-card">
@@ -232,7 +227,7 @@ if df is not None:
     # Card 4: ROAS & Profit OR Top Campaign
     if summary['has_revenue']:
         roas_val = f"{summary['overall_roas']:.2f}x"
-        profit_val = f"${summary['total_profit']:,.2f}"
+        profit_val = f"{currency_symbol}{summary['total_profit']:,.2f}"
         with kpi_cols[3]:
             st.markdown(
                 f"""<div class="kpi-card">
@@ -272,7 +267,7 @@ if df is not None:
             fig_trend = go.Figure()
             fig_trend.add_trace(go.Scatter(
                 x=trends['date'], y=trends['spend'],
-                name='Daily Spend ($)',
+                name=f'Daily Spend ({currency_symbol})',
                 line=dict(color='#1E3A8A', width=3, shape='spline'),
                 fill='tozeroy',
                 fillcolor='rgba(30, 58, 138, 0.05)'
@@ -281,12 +276,12 @@ if df is not None:
             if summary['has_revenue']:
                 fig_trend.add_trace(go.Scatter(
                     x=trends['date'], y=trends['revenue'],
-                    name='Daily Revenue ($)',
+                    name=f'Daily Revenue ({currency_symbol})',
                     line=dict(color='#0D9488', width=3, shape='spline'),
                     fill='tozeroy',
                     fillcolor='rgba(13, 148, 136, 0.05)'
                 ))
-                y_title = "Amount ($)"
+                y_title = f"Amount ({currency_symbol})"
             else:
                 fig_trend.add_trace(go.Scatter(
                     x=trends['date'], y=trends['conversions'],
@@ -297,7 +292,7 @@ if df is not None:
                 fig_trend.update_layout(
                     yaxis2=dict(title="Conversions", overlaying='y', side='right')
                 )
-                y_title = "Spend ($)"
+                y_title = f"Spend ({currency_symbol})"
 
             fig_trend.update_layout(
                 plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
@@ -311,10 +306,10 @@ if df is not None:
         with chart_cols[1]:
             st.subheader("Campaign Efficiency Metrics")
             metric_options = ['spend', 'conversions', 'ctr', 'cpc', 'cvr']
-            metric_labels = ['Total Spend ($)', 'Total Conversions', 'Click-Through Rate (CTR)', 'Cost Per Click (CPC)', 'Conversion Rate (CVR)']
+            metric_labels = [f'Total Spend ({currency_symbol})', 'Total Conversions', 'Click-Through Rate (CTR)', f'Cost Per Click (CPC, {currency_symbol})', 'Conversion Rate (CVR)']
             if summary['has_revenue']:
                 metric_options.extend(['revenue', 'roas', 'profit'])
-                metric_labels.extend(['Total Revenue ($)', 'Return on Ad Spend (ROAS)', 'Net Profit ($)'])
+                metric_labels.extend([f'Total Revenue ({currency_symbol})', 'Return on Ad Spend (ROAS)', f'Net Profit ({currency_symbol})'])
                 
             selected_metric = st.selectbox(
                 "Compare campaign metrics:",
@@ -336,7 +331,7 @@ if df is not None:
             if selected_metric in ['ctr', 'cvr']:
                 yaxis_format = dict(tickformat='.1%')
             elif selected_metric in ['spend', 'revenue', 'profit', 'cpc']:
-                yaxis_format = dict(tickformat='$,.2f')
+                yaxis_format = dict(tickprefix=currency_symbol, tickformat=',.2f')
             elif selected_metric == 'roas':
                 yaxis_format = dict(ticksuffix='x')
 
@@ -352,18 +347,22 @@ if df is not None:
         display_camp_df = campaign_df.copy()
         cols_format = {
             'campaign_name': 'Campaign Name', 'impressions': 'Impressions', 'clicks': 'Clicks',
-            'spend': 'Spend ($)', 'conversions': 'Conversions', 'ctr': 'CTR', 'cpc': 'CPC ($)', 'cvr': 'CVR'
+            'spend': f'Spend ({currency_symbol})', 'conversions': 'Conversions', 'ctr': 'CTR', 'cpc': f'CPC ({currency_symbol})', 'cvr': 'CVR'
         }
         if summary['has_revenue']:
-            cols_format.update({'revenue': 'Revenue ($)', 'roas': 'ROAS', 'profit': 'Profit ($)'})
+            cols_format.update({'revenue': f'Revenue ({currency_symbol})', 'roas': 'ROAS', 'profit': f'Profit ({currency_symbol})'})
             
         display_camp_df = display_camp_df[list(cols_format.keys())].rename(columns=cols_format)
         format_rules = {
-            'Impressions': '{:,.0f}', 'Clicks': '{:,.0f}', 'Spend ($)': '${:,.2f}',
-            'Conversions': '{:,.0f}', 'CTR': '{:.2%}', 'CPC ($)': '${:,.2f}', 'CVR': '{:.2%}'
+            'Impressions': '{:,.0f}', 'Clicks': '{:,.0f}', f'Spend ({currency_symbol})': f'{currency_symbol}{{:,.2f}}',
+            'Conversions': '{:,.0f}', 'CTR': '{:.2%}', f'CPC ({currency_symbol})': f'{currency_symbol}{{:,.2f}}', 'CVR': '{:.2%}'
         }
         if summary['has_revenue']:
-            format_rules.update({'Revenue ($)': '${:,.2f}', 'ROAS': '{:.2f}x', 'Profit ($)': '${:,.2f}'})
+            format_rules.update({
+                f'Revenue ({currency_symbol})': f'{currency_symbol}{{:,.2f}}',
+                'ROAS': '{:.2f}x',
+                f'Profit ({currency_symbol})': f'{currency_symbol}{{:,.2f}}'
+            })
 
         st.dataframe(display_camp_df.style.format(format_rules), use_container_width=True, hide_index=True)
 
@@ -376,7 +375,7 @@ if df is not None:
             with p_cols[0]:
                 st.subheader("Product Revenue / Conversion Share")
                 pie_val = 'profit' if summary['has_revenue'] else 'conversions'
-                pie_label = 'Net Profit ($)' if summary['has_revenue'] else 'Conversions'
+                pie_label = f'Net Profit ({currency_symbol})' if summary['has_revenue'] else 'Conversions'
                 
                 fig_p_pie = px.pie(
                     product_df, values=pie_val, names='product_name', hole=0.4,
@@ -394,12 +393,12 @@ if df is not None:
                 fig_p_bar = go.Figure()
                 fig_p_bar.add_trace(go.Bar(
                     x=product_df['product_name'], y=product_df['spend'],
-                    name='Spend ($)', marker_color='#1E3A8A', width=0.3
+                    name=f'Spend ({currency_symbol})', marker_color='#1E3A8A', width=0.3
                 ))
                 if summary['has_revenue']:
                     fig_p_bar.add_trace(go.Bar(
                         x=product_df['product_name'], y=product_df['revenue'],
-                        name='Revenue ($)', marker_color='#0D9488', width=0.3
+                        name=f'Revenue ({currency_symbol})', marker_color='#0D9488', width=0.3
                     ))
                 else:
                     fig_p_bar.add_trace(go.Bar(
@@ -409,24 +408,29 @@ if df is not None:
                 fig_p_bar.update_layout(
                     barmode='group', plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
                     margin=dict(l=40, r=40, t=35, b=40), height=350,
-                    xaxis=dict(title="Product"), yaxis=dict(gridcolor='#E5E7EB', title="Value ($ / Count)")
+                    xaxis=dict(title="Product"), yaxis=dict(gridcolor='#E5E7EB', title=f"Value ({currency_symbol} / Count)")
                 )
                 st.plotly_chart(fig_p_bar, use_container_width=True)
                 
             st.subheader("Detailed Product Performance")
             display_prod_df = product_df.copy()
             p_cols_format = {
-                'product_name': 'Product Name', 'spend': 'Spend ($)', 'conversions': 'Conversions', 'cvr': 'Conversion Rate'
+                'product_name': 'Product Name', 'spend': f'Spend ({currency_symbol})', 'conversions': 'Conversions', 'cvr': 'Conversion Rate'
             }
             if summary['has_revenue']:
-                p_cols_format.update({'revenue': 'Revenue ($)', 'profit': 'Profit ($)', 'roas': 'ROAS'})
+                p_cols_format.update({'revenue': f'Revenue ({currency_symbol})', 'profit': f'Profit ({currency_symbol})', 'roas': 'ROAS'})
                 
             display_prod_df = display_prod_df[list(p_cols_format.keys())].rename(columns=p_cols_format)
             p_format_rules = {
-                'Spend ($)': '${:,.2f}', 'Conversions': '{:,.0f}', 'Conversion Rate': '{:.2%}'
+                f'Spend ({currency_symbol})': f'{currency_symbol}{{:,.2f}}', 'Conversions': '{:,.0f}', 'Conversion Rate': '{:.2%}'
             }
             if summary['has_revenue']:
-                p_format_rules.update({'Revenue ($)': '${:,.2f}', 'Profit ($)': '${:,.2f}', 'ROAS': '{:.2f}x'})
+                p_format_rules.update({
+                    f'Spend ({currency_symbol})': f'{currency_symbol}{{:,.2f}}',
+                    f'Revenue ({currency_symbol})': f'{currency_symbol}{{:,.2f}}',
+                    f'Profit ({currency_symbol})': f'{currency_symbol}{{:,.2f}}',
+                    'ROAS': '{:.2f}x'
+                })
                 
             st.dataframe(display_prod_df.style.format(p_format_rules), use_container_width=True, hide_index=True)
             
@@ -479,17 +483,21 @@ if df is not None:
             st.subheader("Detailed Region Performance")
             display_reg_df = region_df.copy()
             r_cols_format = {
-                'region': 'Region Name', 'spend': 'Spend ($)', 'conversions': 'Conversions', 'cvr': 'Conversion Rate'
+                'region': 'Region Name', 'spend': f'Spend ({currency_symbol})', 'conversions': 'Conversions', 'cvr': 'Conversion Rate'
             }
             if summary['has_revenue']:
-                r_cols_format.update({'revenue': 'Revenue ($)', 'roas': 'ROAS'})
+                r_cols_format.update({'revenue': f'Revenue ({currency_symbol})', 'roas': 'ROAS'})
                 
             display_reg_df = display_reg_df[list(r_cols_format.keys())].rename(columns=r_cols_format)
             r_format_rules = {
-                'Spend ($)': '${:,.2f}', 'Conversions': '{:,.0f}', 'Conversion Rate': '{:.2%}'
+                f'Spend ({currency_symbol})': f'{currency_symbol}{{:,.2f}}', 'Conversions': '{:,.0f}', 'Conversion Rate': '{:.2%}'
             }
             if summary['has_revenue']:
-                r_format_rules.update({'Revenue ($)': '${:,.2f}', 'ROAS': '{:.2f}x'})
+                r_format_rules.update({
+                    f'Spend ({currency_symbol})': f'{currency_symbol}{{:,.2f}}',
+                    f'Revenue ({currency_symbol})': f'{currency_symbol}{{:,.2f}}',
+                    'ROAS': '{:.2f}x'
+                })
                 
             st.dataframe(display_reg_df.style.format(r_format_rules), use_container_width=True, hide_index=True)
 
@@ -498,35 +506,30 @@ if df is not None:
     # 6. AI Insights Section
     st.markdown("<h2 style='color: #1E3A8A;'>🧠 AI Marketing + Product + Region Intelligence</h2>", unsafe_allow_html=True)
     
-    # Initialize session state for AI insights
-    if "ai_insights" not in st.session_state:
+    # Track which file we've generated insights for
+    if "last_loaded_source" not in st.session_state:
+        st.session_state["last_loaded_source"] = None
         st.session_state["ai_insights"] = None
 
-    # Alert if API key is empty
-    if not api_key:
-        st.info("💡 To generate a written AI strategic plan, please enter your OpenAI API Key in the sidebar.")
-    else:
-        if st.session_state["ai_insights"] is None:
-            trigger_button = st.button("✨ Generate AI Strategic Report", type="primary")
-            if trigger_button:
-                with st.spinner("Compiling marketing, product sales, and geographical metrics for executive report..."):
-                    try:
-                        insights = generate_insights(summary, campaign_df, product_df, region_df, api_key)
-                        st.session_state["ai_insights"] = insights
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Failed to generate insights: {str(e)}")
-        else:
-            # Display insights in a nice styled container
-            st.markdown(f'<div class="ai-insights-box">', unsafe_allow_html=True)
-            st.markdown(st.session_state["ai_insights"])
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            # Allow regeneration
-            re_trigger = st.button("🔄 Regenerate Report")
-            if re_trigger:
-                st.session_state["ai_insights"] = None
-                st.rerun()
+    # If the dataset has changed, reset insights to trigger automatic generation
+    if st.session_state["last_loaded_source"] != data_source_name:
+        st.session_state["last_loaded_source"] = data_source_name
+        st.session_state["ai_insights"] = None
+
+    # Automate insight generation on page load/file upload
+    if st.session_state["ai_insights"] is None:
+        with st.spinner("Compiling marketing, product, and regional metrics for AI strategic review..."):
+            try:
+                insights = generate_insights(summary, campaign_df, product_df, region_df, api_key, currency_symbol)
+                st.session_state["ai_insights"] = insights
+            except Exception as e:
+                st.error(f"Failed to generate insights: {str(e)}")
+    
+    # Render insights if available
+    if st.session_state["ai_insights"] is not None:
+        st.markdown(f'<div class="ai-insights-box">', unsafe_allow_html=True)
+        st.markdown(st.session_state["ai_insights"])
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # 7. PDF Report Generation & Download
     st.markdown("---")
