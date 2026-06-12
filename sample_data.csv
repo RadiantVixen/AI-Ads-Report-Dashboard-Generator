@@ -1,0 +1,16 @@
+date,campaign_name,product_name,region,impressions,clicks,spend,conversions,revenue
+2026-06-01,IG_Skincare_Aloe,Aloe Gel,France,10000,500,120,40,400
+2026-06-01,Google_Search_Aloe,Aloe Gel,Morocco,8000,200,90,10,80
+2026-06-01,TikTok_Serum,Face Serum,Spain,12000,600,150,70,700
+2026-06-01,IG_Skincare_Serum,Face Serum,France,9000,300,100,25,250
+2026-06-01,Google_Search_Cream,Hydra Cream,Morocco,7000,150,80,12,90
+2026-06-02,IG_Skincare_Aloe,Aloe Gel,France,11000,520,130,45,450
+2026-06-02,Google_Search_Aloe,Aloe Gel,Morocco,7500,180,85,8,60
+2026-06-02,TikTok_Serum,Face Serum,Spain,13000,650,160,75,750
+2026-06-02,IG_Skincare_Serum,Face Serum,France,9500,320,110,30,300
+2026-06-02,Google_Search_Cream,Hydra Cream,Morocco,6800,140,75,10,70
+2026-06-03,IG_Skincare_Aloe,Aloe Gel,France,10500,510,125,42,420
+2026-06-03,Google_Search_Aloe,Aloe Gel,Morocco,8200,210,95,12,110
+2026-06-03,TikTok_Serum,Face Serum,Spain,12500,640,155,72,720
+2026-06-03,IG_Skincare_Serum,Face Serum,France,9800,330,115,28,280
+2026-06-03,Google_Search_Cream,Hydra Cream,Morocco,7200,160,82,11,95
